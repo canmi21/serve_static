@@ -1,48 +1,36 @@
-# Sigterm
+# Serve Static
 
-Signal-aware async control and cancellation primitives for Tokio.
+Headless utilities for static file serving: path jail, range parsing, MIME detection, directory listing.
 
-`sigterm` abstracts away the boilerplate of listening for system signals (`Ctrl+C`, `SIGTERM`, etc.) and coordinating shutdown across multiple asynchronous tasks.
+`serve_static` provides framework-agnostic building blocks for serving static files. It performs no I/O and depends on no async runtime, so it integrates with any HTTP server (axum, actix-web, warp, hyper, or your own).
 
 ## Features
 
-- **Signal Waiting**: Wait for `Ctrl+C` or `SIGTERM` across platforms with a single `await`. Use `try_wait()` for non-panicking version.
-- **Cancellation Tokens**: Hierarchy-based cancellation (parent cancels child) powered by `tokio-util`.
-- **Shutdown Primitives**:
-  - `Shutdown`: One-shot channel for single-task termination.
-  - `Broadcast`: Notify multiple subscribers of a shutdown event.
-  - `ShutdownGuard`: RAII guard that triggers shutdown when dropped (useful for panics).
-- **Framework Integration**: `shutdown_signal()` helper designed for seamless integration with `axum::serve`.
-- **Unix Extensions**: Listen for custom signal sets (`SIGHUP`, `SIGQUIT`, etc.) on Unix systems.
+- **Path Resolution**: Safely resolve URI paths to filesystem paths with directory traversal protection, percent-decoding, and optional symlink detection.
+- **Range Parsing**: RFC 9110 compliant HTTP Range header parsing for single byte ranges.
+- **MIME Detection**: Multi-strategy content type detection via file extension, magic bytes, and UTF-8 heuristic.
+- **ETag Generation**: Weak ETag generation from file metadata (mtime + size).
+- **Directory Listing**: Structured data model and sorting for directory entries (directories first, case-insensitive alphabetical).
 
 ## Usage Examples
 
 Check the `examples` directory for runnable code:
 
-- **Basic Usage**: [`examples/simple.rs`](examples/simple.rs) - Wait for a simple shutdown signal.
-- **Server Integration**: [`examples/shutdown_signal.rs`](examples/shutdown_signal.rs) - Combine system signals with internal cancellation (e.g., for Axum).
-- **Task Orchestration**: [`examples/broadcast.rs`](examples/broadcast.rs) - Coordinate multiple workers.
-- **Hierarchical Cancellation**: [`examples/cancellation.rs`](examples/cancellation.rs) - Manage tree-structured tasks.
-- **Scope Guard**: [`examples/guard.rs`](examples/guard.rs) - Ensure shutdown on exit or panic.
+- **Full Demo**: [`examples/usage.rs`](examples/usage.rs) - Demonstrates all modules working together.
 
 ## Installation
 
 ```toml
 [dependencies]
-sigterm = { version = "0.3", features = ["full"] }
+serve_static = { version = "0.x", features = ["full"] }
 ```
 
 ## Feature Flags
 
 | Feature | Description |
 |---------|-------------|
-| `signal` | Enables signal handling (Ctrl+C, SIGTERM) - enabled by default. |
-| `sync` | Enables synchronization primitives (`Shutdown`, `Broadcast`). |
-| `macros` | Enables Tokio macro support. |
-| `rt` | Enables Tokio runtime support (required for `wait_for`). |
-| `cancel` | Enables hierarchical cancellation tokens via `tokio-util`. |
-| `time` | Enables timeout support for signal waiting. |
-| `tracing` | Enables optional tracing instrumentation for debugging. |
+| `sniff` | Enables magic-byte MIME sniffing via `infer` - enabled by default. |
+| `extension` | Enables file extension MIME guessing via `mime_guess` - enabled by default. |
 | `full` | Enables all features above. |
 
 ## License
