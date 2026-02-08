@@ -59,8 +59,10 @@ pub fn resolve(root: &Path, uri: &str, allow_symlinks: bool) -> Result<PathBuf, 
 					// nearest existing ancestor and verify it stays
 					// inside root.
 					let mut ancestor = resolved.clone();
+					let mut verified = false;
 					while ancestor.pop() {
 						if ancestor == root {
+							verified = true;
 							break;
 						}
 						match ancestor.canonicalize() {
@@ -68,6 +70,7 @@ pub fn resolve(root: &Path, uri: &str, allow_symlinks: bool) -> Result<PathBuf, 
 								if !canonical.starts_with(&root) {
 									return Err(Error::SymlinkTraversal);
 								}
+								verified = true;
 								break;
 							}
 							Err(inner)
@@ -76,11 +79,20 @@ pub fn resolve(root: &Path, uri: &str, allow_symlinks: bool) -> Result<PathBuf, 
 							Err(inner) => return Err(Error::SecurityIo(inner)),
 						}
 					}
+					if !verified {
+						return Err(Error::SymlinkTraversal);
+					}
 					return Ok(resolved);
 				}
 				return Err(Error::SecurityIo(e));
 			}
 		}
+	}
+
+	// Defence-in-depth: even when symlinks are allowed the constructed
+	// path must never escape root.
+	if !resolved.starts_with(&root) {
+		return Err(Error::SymlinkTraversal);
 	}
 
 	Ok(resolved)
