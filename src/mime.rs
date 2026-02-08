@@ -96,6 +96,14 @@ mod tests {
 	}
 
 	#[test]
+	#[cfg(all(feature = "extension", feature = "sniff"))]
+	fn extension_overrides_sniff() {
+		let png_header = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+		// .css extension must win over PNG magic bytes
+		assert_eq!(detect(Path::new("style.css"), &png_header), "text/css");
+	}
+
+	#[test]
 	fn utf8_heuristic() {
 		assert_eq!(
 			detect(Path::new("README"), b"Just some plain text"),
@@ -129,5 +137,13 @@ mod tests {
 	fn etag_zero_epoch() {
 		let tag = etag(UNIX_EPOCH, 0);
 		assert_eq!(tag, "W/\"0-0\"");
+	}
+
+	#[test]
+	fn etag_pre_epoch() {
+		let t = UNIX_EPOCH - Duration::from_secs(100);
+		// duration_since(UNIX_EPOCH) fails → unwrap_or_default → nanos=0
+		let tag = etag(t, 42);
+		assert_eq!(tag, "W/\"0-2a\"");
 	}
 }

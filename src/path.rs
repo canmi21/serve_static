@@ -189,6 +189,21 @@ mod tests {
 
 	#[cfg(unix)]
 	#[test]
+	fn symlink_within_root_allowed() {
+		let root = make_root();
+		let target = root.path().join("index.html");
+		let link = root.path().join("alias.html");
+		std::os::unix::fs::symlink(&target, &link).unwrap();
+
+		let result = resolve(root.path(), "/alias.html", false).unwrap();
+		let canon_root = root.path().canonicalize().unwrap();
+		assert!(result.starts_with(&canon_root));
+		// canonicalize resolves the symlink to its real target
+		assert!(result.ends_with("index.html"));
+	}
+
+	#[cfg(unix)]
+	#[test]
 	fn symlink_allowed_when_flag_set() {
 		let root = make_root();
 		let outside = tempfile::tempdir().unwrap();

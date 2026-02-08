@@ -234,6 +234,12 @@ mod tests {
 		assert_eq!(r, ByteRange { start: 0, length: 1 });
 	}
 
+	#[test]
+	fn open_ended_from_start() {
+		let r = parse("bytes=0-", 1000).unwrap();
+		assert_eq!(r, ByteRange { start: 0, length: 1000 });
+	}
+
 	// ── error-path: invalid inputs must return None ──
 
 	#[test]
@@ -268,6 +274,11 @@ mod tests {
 	#[test]
 	fn size_one_file_start_beyond() {
 		assert!(parse("bytes=1-1", 1).is_none());
+	}
+
+	#[test]
+	fn valid_start_invalid_end() {
+		assert!(parse("bytes=0-abc", 1000).is_none());
 	}
 
 	#[test]
