@@ -31,7 +31,16 @@ pub fn parse(header: &str, total_size: u64) -> Option<ByteRange> {
 	}
 
 	let range_part = &header[6..];
+
+	// Multi-range requests (e.g. "bytes=0-50, 100-150") are not
+	// supported by this single-range API; reject them explicitly.
+	if range_part.contains(',') {
+		return None;
+	}
+
 	let (start_str, end_str) = range_part.split_once('-')?;
+	let start_str = start_str.trim();
+	let end_str = end_str.trim();
 
 	if start_str.is_empty() {
 		let suffix_len = end_str.parse::<u64>().ok()?;
@@ -156,5 +165,34 @@ mod tests {
 	#[test]
 	fn zero_total_size() {
 		assert!(parse("bytes=0-0", 0).is_none());
+	}
+
+	#[test]
+	fn multi_range_rejected() {
+		assert!(parse("bytes=0-50, 100-150", 1000).is_none());
+	}
+
+	#[test]
+	fn whitespace_tolerated() {
+		let r = parse("bytes= 100 - 199 ", 1000).unwrap();
+		assert_eq!(
+			r,
+			ByteRange {
+				start: 100,
+				length: 100,
+			}
+		);
+	}
+
+	#[test]
+	fn suffix_with_whitespace() {
+		let r = parse("bytes= -200 ", 1000).unwrap();
+		assert_eq!(
+			r,
+			ByteRange {
+				start: 800,
+				length: 200,
+			}
+		);
 	}
 }

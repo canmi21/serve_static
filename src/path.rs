@@ -33,7 +33,7 @@ pub fn resolve(root: &Path, uri: &str, allow_symlinks: bool) -> Result<PathBuf, 
 		match component {
 			Component::Normal(c) => resolved.push(c),
 			Component::ParentDir => {
-				if resolved > root {
+				if resolved != root {
 					resolved.pop();
 				}
 			}
@@ -51,6 +51,28 @@ pub fn resolve(root: &Path, uri: &str, allow_symlinks: bool) -> Result<PathBuf, 
 			}
 			Err(e) => {
 				if e.kind() == std::io::ErrorKind::NotFound {
+					// The final target does not exist, but intermediate
+					// symlinks could still escape root. Walk up to the
+					// nearest existing ancestor and verify it stays
+					// inside root.
+					let mut ancestor = resolved.clone();
+					while ancestor.pop() {
+						if ancestor == root {
+							break;
+						}
+						match ancestor.canonicalize() {
+							Ok(canonical) => {
+								if !canonical.starts_with(&root) {
+									return Err(Error::SymlinkTraversal);
+								}
+								break;
+							}
+							Err(inner)
+								if inner.kind() == std::io::ErrorKind::NotFound => {}
+
+							Err(inner) => return Err(Error::SecurityIo(inner)),
+						}
+					}
 					return Ok(resolved);
 				}
 				return Err(Error::SecurityIo(e));
@@ -131,6 +153,22 @@ mod tests {
 		std::os::unix::fs::symlink(&secret, &link).unwrap();
 
 		let result = resolve(root.path(), "/link.txt", false);
+		assert!(matches!(result, Err(Error::SymlinkTraversal)));
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn symlink_dir_nonexistent_target_blocked() {
+		let root = make_root();
+		let outside = tempfile::tempdir().unwrap();
+
+		// Symlink an entire directory to an outside location.
+		let link = root.path().join("evil");
+		std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+
+		// Requesting a non-existent file *through* the symlink must
+		// still be caught, even though canonicalize fails with NotFound.
+		let result = resolve(root.path(), "/evil/nonexistent.txt", false);
 		assert!(matches!(result, Err(Error::SymlinkTraversal)));
 	}
 

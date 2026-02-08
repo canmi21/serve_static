@@ -42,11 +42,7 @@ pub struct Entry {
 /// assert_eq!(entries[0].name, "a_dir");
 /// ```
 pub fn sort(entries: &mut [Entry]) {
-	entries.sort_by(|a, b| {
-		b.is_dir
-			.cmp(&a.is_dir)
-			.then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-	});
+	entries.sort_by_cached_key(|entry| (!entry.is_dir, entry.name.to_lowercase()));
 }
 
 #[cfg(test)]
