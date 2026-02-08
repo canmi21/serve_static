@@ -1,7 +1,5 @@
 /* examples/usage.rs */
 
-use std::path::Path;
-
 use serve_static::{listing, mime, path, range};
 
 fn main() {
@@ -16,7 +14,7 @@ fn main() {
 		println!("Range: start={}, length={}", r.start, r.length);
 	}
 
-	let content_type = mime::detect(Path::new("index.html"), &[]);
+	let content_type = mime::detect("index.html", &[]);
 	println!("MIME: {content_type}");
 
 	let tag = mime::etag(std::time::SystemTime::now(), 2048);

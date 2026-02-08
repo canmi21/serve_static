@@ -114,4 +114,47 @@ mod tests {
 		assert_eq!(entries[2].name, "Cargo.toml");
 		assert_eq!(entries[3].name, "readme.md");
 	}
+
+	#[test]
+	fn unicode_filenames() {
+		let mut entries = vec![
+			file("日本語.txt"),
+			file("中文.txt"),
+			file("한국어.txt"),
+			dir("données"),
+		];
+		sort(&mut entries);
+		// Directory comes first; sorting must not panic on non-ASCII
+		assert!(entries[0].is_dir);
+		assert_eq!(entries[0].name, "données");
+	}
+
+	#[test]
+	fn all_directories() {
+		let mut entries = vec![dir("zebra"), dir("alpha"), dir("Mango")];
+		sort(&mut entries);
+		assert_eq!(entries[0].name, "alpha");
+		assert_eq!(entries[1].name, "Mango");
+		assert_eq!(entries[2].name, "zebra");
+	}
+
+	#[test]
+	fn all_files() {
+		let mut entries = vec![file("Zebra.rs"), file("apple.rs"), file("mango.rs")];
+		sort(&mut entries);
+		assert_eq!(entries[0].name, "apple.rs");
+		assert_eq!(entries[1].name, "mango.rs");
+		assert_eq!(entries[2].name, "Zebra.rs");
+	}
+
+	#[test]
+	fn names_equal_after_lowercase() {
+		// Names that collapse to the same lowercase key must not panic
+		let mut entries = vec![file("README"), file("readme"), dir("Readme")];
+		sort(&mut entries);
+		// Directory first, then the two files in stable-ish order
+		assert!(entries[0].is_dir);
+		assert!(!entries[1].is_dir);
+		assert!(!entries[2].is_dir);
+	}
 }

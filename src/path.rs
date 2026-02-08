@@ -16,11 +16,16 @@ use crate::error::Error;
 /// `Ok(path)` is still returned. The caller handles 404 logic.
 ///
 /// ```
+/// // Works with &Path, PathBuf, and &str:
 /// let root = std::env::temp_dir();
 /// let result = serve_static::path::resolve(&root, "/file.txt", true);
 /// assert!(result.is_ok());
+///
+/// let result2 = serve_static::path::resolve(root, "/file.txt", true);
+/// assert!(result2.is_ok());
 /// ```
-pub fn resolve(root: &Path, uri: &str, allow_symlinks: bool) -> Result<PathBuf, Error> {
+pub fn resolve(root: impl AsRef<Path>, uri: &str, allow_symlinks: bool) -> Result<PathBuf, Error> {
+	let root = root.as_ref();
 	let root = root.canonicalize().map_err(|source| Error::InvalidRoot {
 		path: root.to_path_buf(),
 		source,

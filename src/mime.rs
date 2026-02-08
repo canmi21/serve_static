@@ -15,12 +15,17 @@ use std::time::SystemTime;
 /// touches the filesystem. Pass `&[]` for `content` to skip byte-level checks.
 ///
 /// ```
-/// use std::path::Path;
-/// let mime = serve_static::mime::detect(Path::new("data"), b"hello world");
+/// // Works with &Path, PathBuf, and &str:
+/// let mime = serve_static::mime::detect("data", b"hello world");
 /// assert_eq!(mime, "text/plain");
+///
+/// use std::path::PathBuf;
+/// let mime2 = serve_static::mime::detect(PathBuf::from("data"), b"hello world");
+/// assert_eq!(mime2, "text/plain");
 /// ```
 #[must_use]
-pub fn detect(path: &Path, content: &[u8]) -> String {
+pub fn detect(path: impl AsRef<Path>, content: &[u8]) -> String {
+	let path = path.as_ref();
 	#[cfg(feature = "extension")]
 	if let Some(guess) = mime_guess::from_path(path).first()
 		&& !(guess.type_() == "application" && guess.subtype() == "octet-stream")
@@ -145,5 +150,36 @@ mod tests {
 		// duration_since(UNIX_EPOCH) fails → unwrap_or_default → nanos=0
 		let tag = etag(t, 42);
 		assert_eq!(tag, "W/\"0-2a\"");
+	}
+
+	#[test]
+	fn empty_path_with_content() {
+		// Empty path cannot yield an extension guess; UTF-8 content → text/plain
+		assert_eq!(detect(Path::new(""), b"hello world"), "text/plain");
+	}
+
+	#[test]
+	#[cfg(feature = "extension")]
+	fn multi_extension() {
+		// .tar.gz should be recognized by mime_guess
+		let mime = detect(Path::new("archive.tar.gz"), &[]);
+		assert_eq!(mime, "application/gzip");
+	}
+
+	#[test]
+	fn etag_max_size() {
+		// u64::MAX must not panic and must produce a valid hex ETag
+		let tag = etag(UNIX_EPOCH, u64::MAX);
+		assert!(tag.starts_with("W/\"0-"));
+		assert!(tag.ends_with('"'));
+		assert!(tag.contains("ffffffffffffffff"));
+	}
+
+	#[test]
+	fn detect_accepts_pathbuf() {
+		// Verify that PathBuf can be passed directly (impl AsRef<Path>)
+		let p = std::path::PathBuf::from("readme.txt");
+		let mime = detect(p, b"hello");
+		assert!(!mime.is_empty());
 	}
 }
