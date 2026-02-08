@@ -22,7 +22,7 @@ Check the `examples` directory for runnable code:
 
 ```toml
 [dependencies]
-serve_static = { version = "0.x", features = ["full"] }
+serve_static = { version = "0.1", features = ["full"] }
 ```
 
 ## Feature Flags
