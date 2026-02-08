@@ -27,6 +27,9 @@ pub fn resolve(root: &Path, uri: &str, allow_symlinks: bool) -> Result<PathBuf, 
 	})?;
 
 	let decoded = percent_encoding::percent_decode_str(uri).decode_utf8()?;
+	if decoded.contains('\0') {
+		return Err(Error::NullByte);
+	}
 	let mut resolved = root.clone();
 
 	for component in Path::new(decoded.as_ref()).components() {
@@ -207,5 +210,86 @@ mod tests {
 		let result = resolve(root.path(), "/", true).unwrap();
 		let canon_root = root.path().canonicalize().unwrap();
 		assert_eq!(result, canon_root);
+	}
+
+	// ── happy-path: solidify interface behaviour ──
+
+	#[test]
+	fn double_encoding_stays_literal() {
+		// %252e%252e decodes once to "%2e%2e", which is a normal filename,
+		// NOT a traversal component.
+		let root = make_root();
+		let result = resolve(root.path(), "/%252e%252e", true).unwrap();
+		assert!(result.ends_with("%2e%2e"));
+	}
+
+	#[test]
+	fn unicode_filename() {
+		let root = make_root();
+		let result = resolve(root.path(), "/%E4%B8%AD%E6%96%87.txt", true).unwrap();
+		assert!(result.ends_with("中文.txt"));
+	}
+
+	#[test]
+	fn traversal_clamped_then_descend() {
+		// Many ../ followed by a valid descent must resolve inside root.
+		let root = make_root();
+		let result = resolve(root.path(), "/../../assets/images/logo.png", false).unwrap();
+		assert!(result.ends_with("assets/images/logo.png"));
+	}
+
+	#[test]
+	fn query_string_becomes_filename() {
+		// The library does NOT strip query strings; callers must do it.
+		let root = make_root();
+		let result = resolve(root.path(), "/file.txt?key=value", true).unwrap();
+		assert!(result.ends_with("file.txt?key=value"));
+	}
+
+	#[test]
+	fn fragment_becomes_filename() {
+		// Same as query strings — fragments are the caller's concern.
+		let root = make_root();
+		let result = resolve(root.path(), "/file.txt%23section", true).unwrap();
+		assert!(result.ends_with("file.txt#section"));
+	}
+
+	#[test]
+	fn deeply_nested_path() {
+		let root = make_root();
+		let result = resolve(root.path(), "/a/b/c/d/e/f/g/h", true).unwrap();
+		assert!(result.ends_with("a/b/c/d/e/f/g/h"));
+	}
+
+	#[test]
+	fn pure_traversal_resolves_to_root() {
+		let root = make_root();
+		let canon_root = root.path().canonicalize().unwrap();
+		let result = resolve(root.path(), "/../../../../..", true).unwrap();
+		assert_eq!(result, canon_root);
+	}
+
+	// ── error-path: invalid inputs must return Err ──
+
+	#[test]
+	fn null_byte_rejected() {
+		let root = make_root();
+		let result = resolve(root.path(), "/file%00.txt", true);
+		assert!(matches!(result, Err(Error::NullByte)));
+	}
+
+	#[test]
+	fn null_byte_rejected_no_symlinks() {
+		let root = make_root();
+		let result = resolve(root.path(), "/%00", false);
+		assert!(matches!(result, Err(Error::NullByte)));
+	}
+
+	#[test]
+	fn invalid_utf8_encoding_rejected() {
+		// %C3%28 is invalid UTF-8 (0xC3 expects a continuation byte, 0x28 is not).
+		let root = make_root();
+		let result = resolve(root.path(), "/%C3%28", true);
+		assert!(matches!(result, Err(Error::InvalidEncoding(_))));
 	}
 }

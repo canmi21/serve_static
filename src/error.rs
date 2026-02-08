@@ -20,6 +20,10 @@ pub enum Error {
 	#[error("invalid URI encoding: {0}")]
 	InvalidEncoding(#[from] std::str::Utf8Error),
 
+	/// The decoded URI contains a null byte.
+	#[error("null byte in URI path")]
+	NullByte,
+
 	/// A symlink resolved to a path outside the root directory.
 	#[error("path traversal detected via symlink")]
 	SymlinkTraversal,

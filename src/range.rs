@@ -195,4 +195,83 @@ mod tests {
 			}
 		);
 	}
+
+	// ── happy-path: solidify interface behaviour ──
+
+	#[test]
+	fn single_byte() {
+		let r = parse("bytes=0-0", 1000).unwrap();
+		assert_eq!(r, ByteRange { start: 0, length: 1 });
+	}
+
+	#[test]
+	fn full_file() {
+		let r = parse("bytes=0-999", 1000).unwrap();
+		assert_eq!(r, ByteRange { start: 0, length: 1000 });
+	}
+
+	#[test]
+	fn last_byte() {
+		let r = parse("bytes=999-999", 1000).unwrap();
+		assert_eq!(r, ByteRange { start: 999, length: 1 });
+	}
+
+	#[test]
+	fn suffix_equals_total_size() {
+		let r = parse("bytes=-1000", 1000).unwrap();
+		assert_eq!(r, ByteRange { start: 0, length: 1000 });
+	}
+
+	#[test]
+	fn size_one_file_full_range() {
+		let r = parse("bytes=0-0", 1).unwrap();
+		assert_eq!(r, ByteRange { start: 0, length: 1 });
+	}
+
+	#[test]
+	fn size_one_file_suffix() {
+		let r = parse("bytes=-1", 1).unwrap();
+		assert_eq!(r, ByteRange { start: 0, length: 1 });
+	}
+
+	// ── error-path: invalid inputs must return None ──
+
+	#[test]
+	fn empty_header() {
+		assert!(parse("", 1000).is_none());
+	}
+
+	#[test]
+	fn bytes_prefix_only() {
+		// "bytes=" with no range spec — split_once('-') returns None.
+		assert!(parse("bytes=", 1000).is_none());
+	}
+
+	#[test]
+	fn bytes_dash_only() {
+		// "bytes=-" → suffix branch, empty end_str → parse fails.
+		assert!(parse("bytes=-", 1000).is_none());
+	}
+
+	#[test]
+	fn double_dash() {
+		// "bytes=--5" → start_str empty (suffix), end_str "-5" → parse fails.
+		assert!(parse("bytes=--5", 1000).is_none());
+	}
+
+	#[test]
+	fn start_equals_size() {
+		// start == total_size is unsatisfiable (valid range is 0..size-1).
+		assert!(parse("bytes=1000-1000", 1000).is_none());
+	}
+
+	#[test]
+	fn size_one_file_start_beyond() {
+		assert!(parse("bytes=1-1", 1).is_none());
+	}
+
+	#[test]
+	fn open_ended_beyond_size() {
+		assert!(parse("bytes=1000-", 1000).is_none());
+	}
 }
